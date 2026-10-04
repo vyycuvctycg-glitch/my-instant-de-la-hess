@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUSPLAY</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0b18;color:white;font-family:Arial,sans-serif}
+header{padding:24px 5%;background:#15152a}
+.logo{font-size:32px;font-weight:900}
+.logo span{color:#22d3ee}
+header p{color:#aaa}
+main{max-width:1250px;margin:auto;padding:24px}
+h1{font-size:clamp(28px,5vw,48px)}
+h1 span{color:#22d3ee}
+#search{width:100%;padding:15px;border-radius:12px;
+border:1px solid #454566;background:#1b1b32;color:white;
+font-size:16px;margin:10px 0 16px}
+#filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+button{border:0;border-radius:9px;padding:11px 14px;
+background:#292947;color:white;cursor:pointer}
+button.active,button:hover{background:#7952ed}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card{background:#19192e;border:1px solid #33334e;
+border-radius:15px;overflow:hidden;cursor:pointer}
+.card:hover{border-color:#22d3ee;transform:translateY(-2px)}
+.art{height:110px;display:grid;place-items:center;
+font-size:42px;background:linear-gradient(135deg,#6d28d9,#0891b2)}
+.info{padding:12px}
+.info h3{margin:0 0 7px}
+.info p{margin:0;color:#aaa;font-size:13px}
+#status{color:#bdbddd;margin:15px 0}
+#modal{display:none;position:fixed;inset:0;background:#080811f5;
+z-index:5;padding:12px}
+#modal.open{display:flex;flex-direction:column}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px}
+#player{width:100%;flex:1;min-height:0;border:0;border-radius:10px;background:white}
+a{color:#67e8f9}
+footer{text-align:center;color:#999;padding:30px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">NEXUS<span>PLAY</span></div>
+  <p>Des jeux gratuits directement dans ton navigateur 🎮</p>
+</header>
+<main>
+  <h1>Choisis ton jeu.<br><span>Et amuse-toi !</span></h1>
+  <input id="search" placeholder="🔎 Rechercher un jeu..." />
+  <div id="filters"></div>
+  <div id="status">Chargement du catalogue...</div>
+  <div id="grid"></div>
+</main>
+<footer>NEXUSPLAY — Arcade web</footer>
+
+<div id="modal">
+  <div class="bar">
+    <strong id="gameTitle">Jeu</strong>
+    <div>
+      <a id="external" target="_blank" rel="noopener">Ouvrir à part ↗</a>
+      <button id="close">Fermer ✕</button>
+    </div>
+  </div>
+  <iframe id="player" allow="fullscreen; autoplay; gamepad"
+    title="Jeu sélectionné"></iframe>
+</div>
+
+<script>
+const CATALOGUE =
+  "https://raw.githubusercontent.com/sausi-7/games/main/games/registry.json";
+const GAME_ROOT = "https://sausi-7.github.io/games/";
+
+const icons = {
+  arcade:"🕹️", puzzle:"🧩", shooter:"🎯", racing:"🏎️",
+  sports:"⚽", platformer:"🏃", casual:"🎈",
+  board:"♟️", "word-quiz":"📝", "3d":"🌐"
+};
+const names = {
+  arcade:"Arcade", puzzle:"Réflexion", shooter:"Action",
+  racing:"Course", sports:"Sport", platformer:"Plateforme",
+  casual:"Détente", board:"Classiques",
+  "word-quiz":"Quiz et mots", "3d":"3D"
+};
+
+let games = [];
+let selected = "Tous";
+
+const $ = id => document.getElementById(id);
+
+function showFilters(){
+  $("filters").innerHTML = "";
+  const categories = ["Tous", ...new Set(
+    games.map(g => names[g.category] || g.category)
+  )];
+
+  categories.forEach(category => {
+    const button = document.createElement("button");
+    button.textContent = category;
+    button.className = category === selected ? "active" : "";
+    button.onclick = () => {
+      selected = category;
+      showFilters();
+      render();
+    };
+    $("filters").append(button);
+  });
+}
+
+function render(){
+  const query = $("search").value.toLowerCase().trim();
+  const list = games.filter(game => {
+    const category = names[game.category] || game.category;
+    const text = [
+      game.name, game.description, category,
+      ...(game.tags || [])
+    ].join(" ").toLowerCase();
+
+    return (selected === "Tous" || category === selected)
+      && text.includes(query);
+  });
+
+  $("grid").innerHTML = "";
+
+  if(!list.length){
+    $("grid").textContent = "Aucun jeu trouvé.";
+    return;
+  }
+
+  list.forEach((game, index) => {
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const art = document.createElement("div");
+    art.className = "art";
+    art.textContent = icons[game.category] || "🎮";
+
+    const info = document.createElement("div");
+    info.className = "info";
+
+    const title = document.createElement("h3");
+    title.textContent = game.name;
+
+    const desc = document.createElement("p");
+    desc.textContent = game.description || "Jeu en ligne";
+
+    info.append(title, desc);
+    card.append(art, info);
+    card.onclick = () => play(game);
+    $("grid").append(card);
+  });
+
+  $("status").textContent = list.length + " jeu(x) affiché(s)";
+}
+
+function play(game){
+  const url = new URL(game.path, GAME_ROOT).href;
+
+  $("gameTitle").textContent = game.name;
+  $("player").src = url;
+  $("external").href = url;
+  $("modal").classList.add("open");
+}
+
+function closeGame(){
+  $("modal").classList.remove("open");
+  $("player").src = "about:blank";
+}
+
+$("close").onclick = closeGame;
+$("search").addEventListener("input", render);
+
+document.addEventListener("keydown", event => {
+  if(event.key === "Escape") closeGame();
+});
+
+async function loadGames(){
+  try{
+    const response = await fetch(CATALOGUE);
+    if(!response.ok) throw Error("Catalogue indisponible");
+
+    const data = await response.json();
+    games = (data.games || []).filter(game =>
+      game.name && game.path && game.category
+    );
+
+    $("status").textContent =
+      games.length + " jeux trouvés dans le catalogue";
+
+    showFilters();
+    render();
+  }catch(error){
+    $("status").innerHTML =
+      'Impossible de charger automatiquement le catalogue. ' +
+      '<a href="https://sausi-7.github.io/games/" ' +
+      'target="_blank" rel="noopener">Essayer la collection en ligne</a>.';
+
+    $("grid").textContent =
+      "Vérifie ta connexion ou réessaie plus tard.";
+  }
+}
+
+loadGames();
+</script>
+</body>
+</html>
